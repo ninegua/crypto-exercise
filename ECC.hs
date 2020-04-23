@@ -28,15 +28,15 @@ data Curve a
   deriving (Eq, Show)
 
 -- The k1 curve as used by secp256p1: y^2 = x^3 + 7 (mod p)
-makeK1 :: (Integral a, Show a) => Positive a -> Curve a
+makeK1 :: Integral a => Positive a -> Curve a
 makeK1 = Curve 0 7
 
 -------------------------------------------------------------------------------------
-onCurve :: (Integral a, Show a) => Curve a -> Point a -> Bool
+onCurve :: Integral a => Curve a -> Point a -> Bool
 onCurve (Curve a b p) (Point x y) =
   minus p (x * x * x + a * x + b) (y * y) == 0
 
-point :: forall a . (Integral a, Show a) => Curve a -> Gen (Point a)
+point :: forall a . Integral a => Curve a -> Gen (Point a)
 point curve@(Curve _ _ p) = flip suchThat (onCurve curve) $ do
   let range = [0 .. embed p - 1]
   x <- elements range
@@ -81,13 +81,13 @@ point curve@(Curve _ _ p) = flip suchThat (onCurve curve) $ do
 -- 4. When applied to modular integer math, all above calculation should be (mod p).
 --
 addPoint
-  :: (Show a, Eq a, Integral a, Num a, Ord a)
+  :: (Eq a, Integral a, Num a, Ord a)
   => Curve a
   -> Maybe (Point a)
   -> Maybe (Point a)
   -> Maybe (Point a)
-addPoint (Curve a b p) u Nothing = u
-addPoint (Curve a b p) Nothing v = v
+addPoint (Curve a b p) u       Nothing = u
+addPoint (Curve a b p) Nothing v       = v
 addPoint (Curve a b p) (Just (Point x0 y0)) (Just (Point x1 y1))
   | dx == 0 && dy /= 0 = Nothing
   | otherwise = ifZero

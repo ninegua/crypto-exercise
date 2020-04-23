@@ -44,13 +44,13 @@ class s <: t where
   -- embed is a total function
   embed :: s -> t
 
-instance (Show a, Ord a, Num a) => Positive a <: NonNegative a where
+instance (Ord a, Num a) => Positive a <: NonNegative a where
   embed (Positive x) = NonNegative x
 
-instance (Show a, Ord a, Num a) => Positive a <: a where
+instance (Ord a, Num a) => Positive a <: a where
   embed (Positive x) = x
 
-instance (Show a, Ord a, Num a) => NonNegative a <: a where
+instance (Ord a, Num a) => NonNegative a <: a where
   embed (NonNegative x) = x
 
 -- Relation (<:) is reflexive.
@@ -61,22 +61,22 @@ instance a <: a where
 -- The Positive and NonNegative types are defined in QuickCheck, but they were
 -- not made as instances of Num. Here we give the missing definitions.
 
-instance (Ord a, Num a, Show a, Integral a) => Num (Positive a) where
+instance (Ord a, Num a, Integral a) => Num (Positive a) where
   Positive x + Positive y = Positive (x + y)
   Positive x - Positive y = fromIntegral (x - y)
   Positive x * Positive y = Positive (x * y)
-  negate x = error $ "negate: " ++ show x
+  negate (Positive x) = error $ "negate: " ++ show (toInteger x)
   fromInteger x
     | x > 0     = Positive (fromInteger x)
     | otherwise = error $ "fromInteger: " ++ show x ++ " is not Positive"
   abs x = x
   signum _ = 1
 
-instance (Ord a, Num a, Show a, Integral a) => Num (NonNegative a) where
+instance (Ord a, Num a, Integral a) => Num (NonNegative a) where
   NonNegative x + NonNegative y = NonNegative (x + y)
   NonNegative x - NonNegative y = fromIntegral (x - y)
   NonNegative x * NonNegative y = NonNegative (x * y)
-  negate x = error $ "negate: " ++ show x
+  negate (NonNegative x) = error $ "negate: " ++ show (toInteger x)
   fromInteger x
     | x >= 0    = NonNegative (fromInteger x)
     | otherwise = error $ "fromInteger: " ++ show x ++ " is not NonNegative"
@@ -87,7 +87,7 @@ ifZero :: (Eq a, Num a) => NonNegative a -> b -> (Positive a -> b) -> b
 ifZero (NonNegative 0) t _ = t
 ifZero (NonNegative x) _ f = f (Positive x)
 
-positive :: (Integral a, Show a) => NonNegative a -> Positive a
+positive :: Integral a => NonNegative a -> Positive a
 positive (NonNegative x) = fromIntegral x
 
 -------------------------------------------------------------------------------------
@@ -105,7 +105,7 @@ modulo x (Positive y) = NonNegative (if r >= 0 then r else r + y)
 -- A helper function to compute x - y (mod p) when x and y are NonNegative.
 minus
   :: forall a
-   . (Ord a, Num a, Show a, Integral a)
+   . (Ord a, Num a, Integral a)
   => Positive a
   -> NonNegative a
   -> NonNegative a
@@ -113,7 +113,7 @@ minus
 minus p x y = z `modulo` p where z = embed x - embed y :: a
 
 -- Compute x^y, where y is one of Positive, NonNegative.
-pow :: forall f a b . (Num a, Show b, Integral b, f b <: b) => a -> f b -> a
+pow :: forall f a b . (Num a, Integral b, f b <: b) => a -> f b -> a
 pow x y = x ^ (embed y :: b)
 
 -- Two numbers x and y are coprime to each other if and only if gcd(x, y) == 1,
@@ -148,19 +148,19 @@ egcd a b = egcd' a b 1 0 0 1
 
 -- Find the multiplicative inverse x of a (mod m), such that ax = 1 (mod m).
 -- This function is partial, and gives error when a and m are not coprimes.
-invmod :: (Integral a, Show a) => Positive a -> Positive a -> NonNegative a
+invmod :: Integral a => Positive a -> Positive a -> NonNegative a
 invmod (Positive a) (Positive m) =
   let (r, x, _) = egcd (a `mod` m) m
       x'        = x `mod` m
   in  if r == 1
         then fromIntegral $ if x' < 0 then x' + m else x'
-        else error $ "invmod: not coprime " ++ show (a, m)
+        else error $ "invmod: not coprime " ++ show (toInteger a, toInteger m)
 
 -- Calculate the modular exponent: g^x (mod m), where g is either Positive or
 -- NonNegative, x is Integer, and m is Positive.
 expmod
   :: forall a b f
-   . (Integral a, Show a, Ord a, f a <: a)
+   . (Integral a, Ord a, f a <: a)
   => f a
   -> a
   -> Positive a
@@ -207,14 +207,14 @@ isPrime n = n > 1 && n `elem` takeWhile (<= n) primes
 newtype Prime a = Prime (Positive a) deriving (Show, Eq)
 
 -- Produce arbitrary prime number less than `getSize` from QuickCheck.
-instance (Integral a, Show a) => Arbitrary (Prime a) where
+instance Integral a => Arbitrary (Prime a) where
   arbitrary =
     Prime <$> (takeWhile . (>=) <$> getSize' <*> pure primes >>= elements)
     where getSize' = fromIntegral <$> getSize `suchThat` (> 1)
 
 data CoPrime a = CoPrime (Positive a) (Positive a) deriving (Show, Eq)
 
-instance (Arbitrary a, Integral a, Show a, Ord a) => Arbitrary (CoPrime a) where
+instance (Arbitrary a, Integral a, Ord a) => Arbitrary (CoPrime a) where
   arbitrary = do
     p <- arbitrary `suchThat` (>= 2)
     g <- elements [1 .. p - 1] `suchThat` gcdEq (1 :: a) p
